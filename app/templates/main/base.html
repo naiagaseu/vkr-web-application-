@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/libs/bootstrap.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/blocks/table.css') }}">
+    <title>{% block title %}{% endblock %}</title>
+</head>
+
+
+<body>
+<div class="page">
+    <main class="content">
+  
+        {% block content %}{% endblock %}
+    </main>
+    
+</div>
+    
+    
+    <script src="{{ url_for('static', filename='js/libs/bootstrap.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
