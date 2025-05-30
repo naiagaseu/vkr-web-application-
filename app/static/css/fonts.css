@@ -1,0 +1,15 @@
+/*montsterrat*/
+
+@font-face {
+    font-family: Montsterrat;
+    font-style: normal;
+    font-weight: 400;
+    src: url('../fonts/Montsterrat/Montserrat-Regular.ttf');
+}
+
+@font-face {
+    font-family: Montsterrat;
+    font-style: normal;
+    font-weight: 700;
+    src: url('../fonts/Montsterrat/Montserrat-Bold.ttf');
+}
