@@ -1,0 +1,99 @@
+{# app/templates/test/take_session.html #}
+{% extends 'main/base.html' %} {# Наследуем от базового шаблона #}
+
+{# Блок title для заголовка вкладки браузера #}
+{% block content %}
+    {# Контент будет центрирован контейнером из base.html (.content) #}
+
+    {# --- Заголовок страницы (для тела HTML) --- #}
+    {# Будет стилизован через .content h1 в main.css (жирный, центрированный) #}
+    <h1>Комплексная оценка компетенций специалистов по информационной безопасности</h1>
+
+    {# --- Информация о сессии и прогрессе --- #}
+    {# Обернем в div для центрирования текста и добавим отступ снизу #}
+    <div class="session-info-bar text-center mb-3"> {# Bootstrap text-center и mb-3 (margin bottom) #}
+         <p>Сессия ID: {{ session.id }} | Вопрос {{ session.current_question_index + 1 }} из {{ total_questions }}</p> {# Индикатор прогресса #}
+    </div>
+
+
+    {# --- Форма для ответа на текущий вопрос --- #}
+    {# Добавим класс question-form для стилизации формы и ее центрирования #}
+    <form method="POST" class="question-form">
+        {# CSRF токен (если используется, разкомментируй) #}
+        {# {{ form.csrf_token }} #}
+
+        {# Проверяем, что объект вопроса существует #}
+        {% if question %}
+            {# Карточка с вопросом (Bootstrap .card). mb-3 для отступа снизу. #}
+            {# Будет центрирована через стили .question-form #}
+            <div class="card mb-3">
+                <div class="card-body">
+                    {# Заголовок карточки: номер вопроса и текст #}
+                    <h5 class="card-title">{{ session.current_question_index + 1 }}. {{ question.text }}</h5>
+
+                    {# Варианты ответа (Multiple Choice) #}
+                    {% if question.question_type == 'multiple_choice' %}
+                        {% for option in question.options %}
+                            {# form-check - Bootstrap класс для radio/checkbox + label #}
+                            <div class="form-check">
+                                {# input для радио-кнопки #}
+                                <input class="form-check-input" type="radio"
+                                       name="question_{{ question.id }}" {# Имя поля - question_IDвопроса #}
+                                       id="option_{{ option.id }}"      {# Уникальный ID для связки с label #}
+                                       value="{{ option.id }}"          {# Значение - ID варианта #}
+                                       required> {# HTML5 валидация: обязательное поле #}
+                                {# label для текста варианта ответа #}
+                                <label class="form-check-label" for="option_{{ option.id }}">
+                                    {{ option.text }}
+                                </label>
+                            </div>
+                        {% endfor %}
+
+                    {# Поле для текстового ответа #}
+                    {% elif question.question_type == 'text_input' %}
+                         <div class="form-group"> {# Bootstrap класс #}
+                            <label for="text_answer_{{ question.id }}">Ваш ответ:</label>
+                            <textarea class="form-control" {# Bootstrap класс #}
+                                      id="text_answer_{{ question.id }}"
+                                      name="question_{{ question.id }}" {# Имя поля такое же как у radio, значением будет введенный текст #}
+                                      rows="3" required></textarea> {# HTML5 валидация: обязательное поле, 3 строки #}
+                        </div>
+
+                    {# Неизвестный тип вопроса #}
+                    {% else %}
+                         <p>Неизвестный тип вопроса: {{ question.question_type }}</p>
+                    {% endif %}
+
+                </div> {# Конец card-body #}
+            </div> {# Конец card mb-3 #}
+
+             {# --- Кнопка действия (Следующий / Завершить) --- #}
+             {# Обернем кнопку в div для выравнивания справа #}
+             {# Используем класс form-button-container для стилизации выравнивания #}
+             <div class="form-button-container">
+
+                 {# Сама кнопка Submit. btn, btn-lg, mt-3 - Bootstrap классы. btn-pink - наш кастомный класс. #}
+                 {% if session.current_question_index + 1 < total_questions %}
+                     {# Кнопка "Следующий вопрос" #}
+                     <button type="submit" class="btn btn-pink btn-lg mt-3">Следующий вопрос</button>
+                 {% else %}
+                     {# Кнопка "Завершить тест" (зеленая по Bootstrap, но мы переопределим цветом btn-pink) #}
+                     <button type="submit" class="btn btn-success btn-lg mt-3 btn-pink">Завершить тест и получить результаты</button>
+                 {% endif %}
+
+             </div> {# Конец form-button-container #}
+
+        {# Если вопрос не найден (маловероятно при правильной логике) #}
+        {% else %}
+            <p>Не удалось загрузить текущий вопрос.</p>
+        {% endif %}
+
+    </form> {# Конец form.question-form #}
+    
+    <footer class="py-3 my-4">
+        
+        <p class="text-center text-body-secondary">VKR 2025</p>
+    </footer>
+
+</div> {# Конец container #}
+{% endblock %}

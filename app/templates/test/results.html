@@ -1,0 +1,288 @@
+{# app/templates/test/results.html #}
+{% extends 'main/base.html' %} {# Наследуем от базового шаблона #}
+
+{# Блок title для заголовка вкладки браузера #}
+{% block title %}Результаты тестирования - {{ session.test.name }}{% endblock %}
+
+{% block content %}
+    <div class="container my-4"> {# Используем Bootstrap контейнер для центрирования #}
+
+        {# --- Заголовок страницы (для тела HTML) --- #}
+        {# Будет стилизован через .content h1 в main.css (жирный, центрированный) #}
+        <h1>Результаты теста</h1>
+
+        {# --- Информация о сессии завершения --- #}
+        {# Обернем в div для центрирования текста и добавим отступ #}
+        <div class="session-info-bar text-center mb-4"> {# text-center и mb-4 из Bootstrap #}
+             <p>Сессия ID: {{ session.id }} | Завершено: {{ session.end_time.strftime('%Y-%m-%d %H:%M:%S')}}</p>
+        </div>
+
+
+        {# --- СЕКЦИЯ ИНТЕГРАЛЬНОЙ ОЦЕНКИ ПО РОЛЯМ --- #}
+        <h2>Интегральная оценка готовности по ролям</h2>
+
+        {% if role_results %} {# Проверяем, есть ли данные по ролям #}
+            <table class="table table-striped mb-4"> {# Bootstrap стили для таблицы #}
+                <thead>
+                    <tr>
+                        <th>Профессиональная роль</th>
+                        <th>Оценка готовности</th>
+                        <th>Ключевые компетенции</th> 
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for res in role_results %} {# res - это словарь из списка, переданного из Flask #}
+                        <tr>
+                            {# Исправляем обращение к данным: используем ключи словаря, которые Flask передает #}
+                            <td>{{ res.role_name }}</td> {# Доступ по ключу 'role_name' #}
+                            <td>{{ res.integral_score | round(2) }}%</td> {# Доступ по ключу 'integral_score' #}
+
+                            <td> <h3>
+                                {% if res.key_competencies %} {# Проверяем, что список компетенций не пустой #}
+                                    {# key_competencies - это ключ для списка имен навыков #}
+                                    {{ res.key_competencies | join('; ') }} {# Объединяем элементы списка через запятую #}
+                                {% else %}
+                                    - {# Если список компетенций пустой #}
+                                {% endif %} </h3>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p class="mb-4">Результаты по ролям не найдены.</p>
+        {% endif %}
+
+
+        {# --- СЕКЦИЯ HARD SKILLS --- #}
+       
+
+        {# Проверяем, есть ли результаты Hard Skills для отображения таблицы или диаграммы #}
+        {% if hard_skill_results and hard_skill_results|length > 0 %}
+
+             {# --- Таблица Hard Skills (опционально, если нужно) --- #}
+             {# Раскомментируй этот блок, если нужна таблица с цифрами Hard Skills #}
+            
+
+            {# --- Радиальная диаграмма Hard Skills --- #}
+            <h2 class="center">Профиль Hard Skills</h2>
+            {# Контейнер для canvas с диаграммой. Устанавливаем размеры. #}
+            {# Добавь Bootstrap классы d-flex и justify-content-center, чтобы центрировать контейнер диаграммы, если нужно #}
+            <div style="width: 700px; height: 700px; margin: auto;" class="mb-4 d-flex justify-content-center"> {# Возможно, margin: auto; уже не нужен если justify-content-center работает #}
+                 {# Элемент canvas для рисования диаграммы. ID важен! Атрибуты width/height #}
+                 <canvas id="hardSkillsRadarChart" width="700" height="700"></canvas>
+            </div>
+
+            {# --- СКРИПТЫ ДЛЯ ДИАГРАММЫ --- #}
+
+            {# 1. Подключаем библиотеку Chart.js (локально) #}
+            {# Убедитесь, что файл chart.umd.min.js находится в app/static/js/libs #}
+            {# Подключаем в конце body, чтобы HTML успел загрузиться #}
+            <script src="{{ url_for('static', filename='js/libs/chart.umd.min.js') }}"></script>
+
+            {# 2. Скрипт для инициализации диаграммы. #}
+            <script>
+                // --- ВСТАВКА ДАННЫХ ИЗ ФЛАСК (в формате JSON) ---
+                // chart_data_full - это словарь, переданный из Flask, преобразованный в JSON строку фильтром |tojson
+                const chartDataFull = {{ chart_data_full | tojson }};
+                // --- КОНЕЦ ВСТАВКИ ДАННЫХ ---
+
+                console.log("Chart data received from Flask:", chartDataFull); // Лог данных в консоли браузера
+
+
+                // Ждем полной загрузки HTML документа, чтобы гарантировать, что canvas элемент существует
+                document.addEventListener('DOMContentLoaded', function() {
+
+                    console.log("DOMContentLoaded fired. Attempting to render Hard Skills Radar Chart.");
+
+                    // Проверяем, загрузилась ли библиотека Chart.js
+                    if (typeof Chart === 'undefined') {
+                         console.error('Chart.js library is not loaded correctly! Check script path.');
+                         const chartContainer = document.getElementById('hardSkillsRadarChart')?.parentElement;
+                         if (chartContainer) {
+                             const messageDiv = document.createElement('p'); // Используем p или div для сообщения
+                             messageDiv.style.color = 'red';
+                             messageDiv.textContent = 'Ошибка: Библиотека для диаграммы не загружена.';
+                             chartContainer.parentElement.insertBefore(messageDiv, chartContainer);
+                             chartContainer.style.display = 'none'; // Скрываем canvas с ошибкой
+                         }
+                         return; // Прекращаем выполнение скрипта
+                    }
+
+                    // Получаем контекст рисования 2D для canvas элемента
+                    const ctx = document.getElementById('hardSkillsRadarChart')?.getContext('2d'); // Используем optional chaining ?. и сразу getContext
+
+
+                    if (!ctx) {
+                        console.error('CRITICAL ERROR: Canvas element or its 2D context not found!');
+                         const chartContainer = document.getElementById('hardSkillsRadarChart')?.parentElement;
+                         if (chartContainer) {
+                             const messageDiv = document.createElement('p');
+                             messageDiv.style.color = 'red';
+                             messageDiv.textContent = 'Ошибка: Не удалось найти элемент для диаграммы.';
+                             chartContainer.parentElement.insertBefore(messageDiv, chartContainer);
+                             chartContainer.style.display = 'none';
+                         }
+                        return; // Прекращаем выполнение скрипта
+                    }
+
+                    // Проверяем, что данные валидны для рисования диаграммы Hard Skills
+                    if (!chartDataFull || !chartDataFull.labels || !Array.isArray(chartDataFull.labels) || chartDataFull.labels.length === 0 || !chartDataFull.datasets || !Array.isArray(chartDataFull.datasets) || chartDataFull.datasets.length === 0 || !chartDataFull.datasets[0].data || !Array.isArray(chartDataFull.datasets[0].data) || chartDataFull.datasets[0].data.length === 0 || chartDataFull.labels.length !== chartDataFull.datasets[0].data.length) {
+                         console.warn("Empty, invalid or inconsistent chart data received. Skipping chart rendering.", chartDataFull);
+                         const chartContainer = document.getElementById('hardSkillsRadarChart')?.parentElement;
+                          if (chartContainer) {
+                             const messageDiv = document.createElement('p');
+                             messageDiv.textContent = 'Недостаточно данных или данные некорректны для построения диаграммы Hard Skills.';
+                              chartContainer.parentElement.insertBefore(messageDiv, chartContainer);
+                              chartContainer.style.display = 'none';
+                         }
+                         return; // Выходим, не пытаясь рисовать
+                    }
+
+
+                    // --- Функции для форматирования меток на радиальной диаграмме (как раньше) ---
+
+                    // Функция для удаления текста в скобках в конце метки
+                    function cleanLabel(label) {
+                        if (typeof label !== 'string') return ""; // Проверка типа на случай
+                        return label.replace(/\s*\(.*\)$/, '');
+                    }
+
+                    // Функция для разделения метки на строки (логика как раньше, подстройте maxLength и padding в опциях ниже)
+                    function splitLabelIntoLines(label, maxLineLength) {
+                        const cleanedLabel = cleanLabel(label); // Чистим перед разделением
+                        if (!cleanedLabel) return [];
+                        const words = cleanedLabel.split(' ');
+                        const lines = [];
+                        let currentLine = '';
+
+                        for (let i = 0; i < words.length; i++) {
+                            const word = words[i];
+                            if (currentLine.length > 0 && currentLine.length + word.length + 1 > maxLineLength) {
+                                lines.push(currentLine.trim());
+                                currentLine = word;
+                            } else {
+                                currentLine += (currentLine.length > 0 ? " " : "") + word;
+                            }
+                        }
+                        if (currentLine.length > 0) {
+                            lines.push(currentLine.trim());
+                        }
+                         return lines.length > 0 ? lines : [cleanedLabel]; // Возвращаем либо массив строк, либо исходную метку в массиве
+                    }
+
+
+                    // --- Объект конфигурации для Chart.js ---
+                    const config = {
+                        type: 'radar', // Тип диаграммы - радиальная
+                        data: chartDataFull, // Используем переменную с данными из Flask
+                    
+                        options: {
+                            responsive: true, // Оставляем отзывчивость
+                            maintainAspectRatio: false, // Не сохранять стандартное соотношение сторон canvas
+                            plugins: {
+                                 legend: { display: true, position: 'top' }, // Легенда (название профиля Hard Skills)
+                                 tooltip: { // Настройка всплывающих подсказок при наведении
+                                     callbacks: {
+                                         label: function(context) { // Формат текста в тултипе
+                                            let label = context.dataset.label || '';
+                                            if (label) { label += ': '; }
+                                            label += context.parsed.r.toFixed(2) + '%'; // Значение с %
+                                            return label;
+                                         }
+                                     }
+                                 }
+                            },
+                            scales: {
+                                r: { // Настройки радиальной шкалы
+                                    angleLines: { display: true }, // Линии от центра к точкам
+                                    suggestedMin: 0, suggestedMax: 100, // Шкала от 0 до 100%
+                                    pointLabels: { // Метки навыков на осях
+                                        display: true,
+                                        font: {
+                                            size: 10 // Размер шрифта меток. Подстроить!
+                                        },
+                                        // Callback для форматирования метки (удаление скобок, разбиение на строки)
+                                        callback: function(label) {
+                                            // Длина строки для разделения. Подстройте под длину ваших названий навыков!
+                                            const maxLength = 33; // Примерное количество символов в строке до переноса.
+                                            return splitLabelIntoLines(label, maxLength);
+                                        },
+                                        // Отступ меток от конца оси. Подстроить!
+                                        padding: 25 // Расстояние в пикселях. Увеличьте, если метки наезжают на диаграмму.
+                                    },
+                                    ticks: { // Метки значений на шкале (0, 20, 40...)
+                                        beginAtZero: true,
+                                        stepSize: 20, // Шаг шкалы
+                                        callback: function(value){ return value + '%'; } // Добавляем % к меткам шкалы
+                                    },
+                                    grid: { circular: true } // Круговая сетка
+                                }
+                            }
+                        }
+                    };
+
+                    // Создаем новый экземпляр диаграммы Chart, привязывая его к canvas контексту и конфигурации
+                    const hardSkillsRadarChart = new Chart(ctx, config);
+
+                    console.log("Hard Skills Radar Chart rendered.");
+
+                    // Опционально: Вызвать resize() после создания, может помочь в некоторых случаях
+                    // if (hardSkillsRadarChart) { hardSkillsRadarChart.resize(); }
+
+                }); // Конец DOMContentLoaded
+            </script>
+
+        {# Конец блока if для hard_skill_results (который также используется для данных диаграммы) #}
+        {% else %} {# Если список hard_skill_results пустой или null #}
+            <p class="mt-4 mb-4 text-center">Результаты по жестким навыкам не найдены или недостаточно данных для построения диаграммы.</p>
+        {% endif %}
+
+
+        {# --- СЕКЦИЯ ОЦЕНКИ SOFT SKILLS --- #}
+        <h2 >Оценка Soft Skills</h2> {# mt-4 и mb-3 из Bootstrap #}
+
+        {% if soft_skill_results_with_interpretation %} {# Проверяем, есть ли данные по Soft Skills #}
+            <table class="table table-striped mb-4"> {# Bootstrap стили для таблицы #}
+                <thead>
+                    <tr>
+                        <th>Навык</th>
+                        <th>Качественная оценка</th>
+                    </tr>
+                </thead>
+<tbody>
+{% for res in soft_skill_results_with_interpretation %} {# res - словарь #}
+    <tr>
+        {# Исправляем обращение: используем ключи словаря #}
+        <td>{{ res.skill_name }}</td> {# Доступ по ключу 'skill_name' #}
+        <td>{{ res.interpretation }}</td> {# Доступ по ключу 'interpretation' #}
+    </tr>
+{% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+             <p class="mb-4 text-center">Результаты по мягким навыкам не найдены.</p>
+        {% endif %}
+        {# --- КОНЕЦ СЕКЦИИ SOFT SKILLS --- #}
+
+        {# --- ССЫЛКА НА ГЛАВНУЮ СТРАНИЦУ --- #}
+        <div class="form-button-container">
+             <a href="{{ url_for('test.index') }}" class="btn btn-pink btn-lg mt-3">На главную страницу тестирования</a></p>
+        </div>
+      
+
+
+    </div> {# Конец container #}
+
+    {# !!! ВНИМАНИЕ: JavaScript для диаграммы должен быть здесь или в конце body в базовом шаблоне !!! #}
+    {# Я перенес скрипты Chart.js и инициализации диаграммы в конец этого файла шаблона, #}
+    {# чтобы гарантировать, что элемент canvas уже существует, когда скрипт запускается. #}
+    {# Это стандартная практика. Если они были в base.html до закрытия body, можно оставить там. #}
+
+    {# --- СКРИПТЫ ДЛЯ ДИАГРАММЫ (перенесены в конец файла, перед закрывающим </body>) --- #}
+    {# Я их оставил в разделе "--- СКРИПТЫ ДЛЯ ДИАГРАММЫ ---" выше в этом же файле #}
+    {# Но вообще лучше их переносить ближе к </body> в base.html или самом results.html #}
+    {# Я верну их в их первоначальное место (после div.mb-4) #}
+
+
+{% endblock %} {# Конец блока content #}
